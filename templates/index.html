@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI & Deep Learning Traffic Signal Violation Detection System - Live CCTV surveillance monitoring, stop-line crossing detection, vehicle speed tracking, and automated evidence capture.">
+    <title>AI Traffic Signal Violation Detection & Speed Surveillance</title>
+    <!-- Google Fonts: Outfit & Space Grotesk -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Top Navigation Bar -->
+        <header class="top-nav" id="top-navbar">
+            <div class="brand-section">
+                <div class="brand-logo-glow">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                        <polyline points="2 17 12 22 22 17"></polyline>
+                        <polyline points="2 12 12 17 22 12"></polyline>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="brand-title">TRAFFIC SIGNAL VIOLATION DETECTOR</h1>
+                    <p class="brand-subtitle">AI & Deep Learning Surveillance System &bull; Anand et al., IJARET 2021</p>
+                </div>
+            </div>
+
+            <div class="nav-badges">
+                <div class="status-indicator">
+                    <span class="live-dot pulse-animation" id="live-indicator-dot"></span>
+                    <span class="status-label" id="live-status-text">LIVE SURVEILLANCE</span>
+                </div>
+                <div class="paper-badge" title="Implementation of IEEE / IJARET Scopus Indexed Paper">
+                    <span class="badge-tag">PAPER REF</span>
+                    <span class="badge-val">YOLOv8 + ROI</span>
+                </div>
+                <button class="btn-primary" id="btn-export-csv">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Export CSV Report
+                </button>
+            </div>
+        </header>
+
+        <!-- KPI Metrics Grid -->
+        <section class="kpi-grid" aria-label="System Metrics">
+            <div class="kpi-card" id="kpi-total-vehicles">
+                <div class="kpi-icon-wrap icon-blue">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.5 2.8C2.1 10.7 2 11 2 11.3V16c0 .6.4 1 1 1h2"></path>
+                        <circle cx="7" cy="17" r="2"></circle>
+                        <path d="M9 17h6"></path>
+                        <circle cx="17" cy="17" r="2"></circle>
+                    </svg>
+                </div>
+                <div class="kpi-content">
+                    <span class="kpi-label">Total Vehicles Counted</span>
+                    <span class="kpi-number" id="stat-total-vehicles">0</span>
+                </div>
+            </div>
+
+            <div class="kpi-card" id="kpi-active-vehicles">
+                <div class="kpi-icon-wrap icon-cyan">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polygon points="12 6 12 12 16 14"></polygon>
+                    </svg>
+                </div>
+                <div class="kpi-content">
+                    <span class="kpi-label">Active In Scene</span>
+                    <span class="kpi-number" id="stat-active-vehicles">0</span>
+                </div>
+            </div>
+
+            <div class="kpi-card kpi-alert-red" id="kpi-signal-jumps">
+                <div class="kpi-icon-wrap icon-red">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                </div>
+                <div class="kpi-content">
+                    <span class="kpi-label">Signal Jump Violations</span>
+                    <span class="kpi-number" id="stat-signal-violations">0</span>
+                </div>
+            </div>
+
+            <div class="kpi-card kpi-alert-amber" id="kpi-speed-violations">
+                <div class="kpi-icon-wrap icon-amber">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                    </svg>
+                </div>
+                <div class="kpi-content">
+                    <span class="kpi-label">Speeding Violations</span>
+                    <span class="kpi-number" id="stat-speed-violations">0</span>
+                </div>
+            </div>
+
+            <div class="kpi-card" id="kpi-fps">
+                <div class="kpi-icon-wrap icon-purple">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                </div>
+                <div class="kpi-content">
+                    <span class="kpi-label">Surveillance FPS</span>
+                    <span class="kpi-number" id="stat-fps">0.0</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Workspace -->
+        <main class="main-dashboard-grid">
+            <!-- Left: Video Feed & Interactive Controls -->
+            <section class="video-panel-wrapper">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <span class="live-badge">FEED</span>
+                        <h2 class="panel-heading">CCTV Stream & Stop Line Tracking</h2>
+                    </div>
+                    <div class="video-selector-wrap">
+                        <label for="select-video-source" class="input-label">Feed Source:</label>
+                        <select id="select-video-source" class="custom-select" aria-label="Select Video Source"></select>
+                    </div>
+                </div>
+
+                <!-- Video Viewport with Interactive Canvas -->
+                <div class="video-container" id="video-viewport">
+                    <img id="main-video-stream" src="/video_feed" alt="Real-time Traffic CCTV Detection Stream">
+                    <canvas id="interactive-canvas"></canvas>
+                    
+                    <!-- Floating Stop Line Helper -->
+                    <div class="canvas-help-badge" id="canvas-help-badge">
+                        <span>Click & Drag to Reposition Stop Line</span>
+                    </div>
+                </div>
+
+                <!-- Video Actions & Traffic Signal Remote -->
+                <div class="video-toolbar">
+                    <div class="playback-controls">
+                        <button class="toolbar-btn" id="btn-toggle-pause" title="Play or Pause Stream">
+                            <span id="pause-icon">&#10074;&#10074; Pause</span>
+                        </button>
+                        <button class="toolbar-btn" id="btn-reset-pipeline" title="Reset Counter and Violations">
+                            <span>&#8634; Reset</span>
+                        </button>
+                    </div>
+
+                    <!-- Traffic Signal Manual / Auto Switcher -->
+                    <div class="traffic-signal-remote">
+                        <span class="remote-label">Signal Control:</span>
+                        <button class="signal-btn btn-signal-auto active" id="btn-sig-auto" data-mode="AUTO_CYCLE">
+                            Auto Cycle
+                        </button>
+                        <button class="signal-btn btn-signal-green" id="btn-sig-green" data-state="GREEN">
+                            Green
+                        </button>
+                        <button class="signal-btn btn-signal-yellow" id="btn-sig-yellow" data-state="YELLOW">
+                            Yellow
+                        </button>
+                        <button class="signal-btn btn-signal-red" id="btn-sig-red" data-state="RED">
+                            Red (Enforce)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Parameter Sliders -->
+                <div class="parameters-deck">
+                    <div class="param-card">
+                        <div class="param-header">
+                            <label for="slider-speed-limit">Speed Limit (km/h)</label>
+                            <span class="param-value" id="val-speed-limit">45 km/h</span>
+                        </div>
+                        <input type="range" id="slider-speed-limit" min="10" max="100" step="5" value="45" class="slider-control">
+                    </div>
+
+                    <div class="param-card">
+                        <div class="param-header">
+                            <label for="slider-confidence">YOLO Confidence</label>
+                            <span class="param-value" id="val-confidence">0.35</span>
+                        </div>
+                        <input type="range" id="slider-confidence" min="0.1" max="0.9" step="0.05" value="0.35" class="slider-control">
+                    </div>
+
+                    <div class="param-card">
+                        <div class="param-header">
+                            <label for="slider-calibration">Calibration (m/px)</label>
+                            <span class="param-value" id="val-calibration">0.045</span>
+                        </div>
+                        <input type="range" id="slider-calibration" min="0.01" max="0.15" step="0.005" value="0.045" class="slider-control">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right: Real-time Incident Feed & Evidence Gallery -->
+            <section class="incidents-panel-wrapper">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <span class="alert-count-pill" id="badge-violation-count">0</span>
+                        <h2 class="panel-heading">Violation Incident Log</h2>
+                    </div>
+                    <span class="incident-status-indicator">Automated Evidence Capture</span>
+                </div>
+
+                <div class="incidents-scrollable-list" id="incidents-container">
+                    <div class="empty-state" id="empty-incidents-placeholder">
+                        <div class="empty-icon">
+                            <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <p class="empty-title">All Traffic Compliant</p>
+                        <p class="empty-desc">No red light jumps or over-speeding violations detected yet.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Evidence Modal -->
+        <div class="modal-overlay" id="evidence-modal" role="dialog" aria-modal="true" aria-labelledby="modal-vehicle-title">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <div>
+                        <h3 class="modal-title" id="modal-vehicle-title">Violation Evidence Report</h3>
+                        <p class="modal-subtitle" id="modal-incident-meta">Vehicle Incident Record</p>
+                    </div>
+                    <button class="btn-close-modal" id="btn-close-modal" aria-label="Close modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="modal-image-container">
+                        <img id="modal-evidence-img" src="" alt="Violation Snapshot Evidence Crop">
+                    </div>
+                    <div class="modal-details-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Vehicle ID</span>
+                            <span class="detail-val" id="modal-detail-id">-</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Vehicle Type</span>
+                            <span class="detail-val" id="modal-detail-class">-</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Recorded Speed</span>
+                            <span class="detail-val text-amber" id="modal-detail-speed">-</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Signal Light</span>
+                            <span class="detail-val text-red" id="modal-detail-light">-</span>
+                        </div>
+                        <div class="detail-item full-width">
+                            <span class="detail-label">Offense Classification</span>
+                            <span class="detail-badge-offense" id="modal-detail-violation">-</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <a id="btn-download-evidence" href="" download class="btn-primary">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Download Evidence JPG
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
