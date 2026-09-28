@@ -350,14 +350,20 @@ def export_csv():
 
     si = io.StringIO()
     cw = csv.writer(si)
-    cw.writerow(["Violation_ID", "Vehicle_ID", "Class", "Speed_kmh", "Violation_Type", "Signal_State", "Frame", "Timestamp", "Evidence_Snapshot"])
+    cw.writerow([
+        "Violation_ID", "Vehicle_ID", "License_Plate", "Vehicle_Class",
+        "Speed_kmh", "Violation_Type", "Fine_Amount_INR", "Signal_State",
+        "Frame", "Timestamp", "Evidence_Snapshot"
+    ])
     for v in viols:
         cw.writerow([
             v['violation_id'],
             v['track_id'],
+            v.get('plate_number', 'N/A'),
             v['class_name'],
             v['speed_kmh'],
             v['violation_type'],
+            v.get('fine_amount', 1000),
             v['signal_state'],
             v['frame_idx'],
             v['timestamp'],

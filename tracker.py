@@ -46,6 +46,57 @@ class TrackedVehicle:
         self.overspeed_count = 0
         self.is_confirmed = False
 
+        # License Plate Tracking
+        self.plate_number: str = "SEARCHING..."
+        self.plate_conf: float = 0.0
+        self.plate_verified: bool = False
+        self.plate_bbox: Optional[List[int]] = None
+        self.plate_crop: Optional[np.ndarray] = None
+        self.plate_candidates: Dict[str, int] = {}
+        self.plate_last_check_frame: int = 0
+
+    def update_plate(
+        self,
+        plate_text: str,
+        conf: float,
+        plate_bbox: Optional[List[int]] = None,
+        plate_crop: Optional[np.ndarray] = None,
+        is_verified: bool = False
+    ):
+        """Update vehicle's recognized plate with multi-frame voting."""
+        if not plate_text:
+            return
+
+        self.plate_candidates[plate_text] = self.plate_candidates.get(plate_text, 0) + (3 if is_verified else 1)
+
+        # If verified OCR or higher confidence or current plate is fallback
+        if is_verified and not self.plate_verified:
+            self.plate_number = plate_text
+            self.plate_conf = conf
+            self.plate_verified = True
+            if plate_bbox:
+                self.plate_bbox = plate_bbox
+            if plate_crop is not None:
+                self.plate_crop = plate_crop
+        elif is_verified and self.plate_verified:
+            # Pick highest vote candidate
+            best_plate = max(self.plate_candidates.items(), key=lambda x: x[1])[0]
+            self.plate_number = best_plate
+            if conf > self.plate_conf:
+                self.plate_conf = conf
+                if plate_bbox:
+                    self.plate_bbox = plate_bbox
+                if plate_crop is not None:
+                    self.plate_crop = plate_crop
+        elif not self.plate_verified:
+            if conf > self.plate_conf or self.plate_number == "SEARCHING...":
+                self.plate_number = plate_text
+                self.plate_conf = conf
+                if plate_bbox:
+                    self.plate_bbox = plate_bbox
+                if plate_crop is not None:
+                    self.plate_crop = plate_crop
+
     @property
     def current_anchor(self) -> Tuple[int, int]:
         return ((self.bbox[0] + self.bbox[2]) // 2, self.bbox[3])

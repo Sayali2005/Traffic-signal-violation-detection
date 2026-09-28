@@ -8,8 +8,11 @@
 An end-to-end Computer Vision and Deep Learning system designed for automated traffic surveillance. It detects multiple traffic violations simultaneously in real-time video footage:
 - 🚦 **Traffic Signal Jump Detection**: Monitors designated stop lines and flags vehicles crossing during a **RED** light.
 - ⚡ **Speed Estimation & Speed Violation**: Computes frame-by-frame velocity using spatial displacement of road-contact anchor points and camera calibration, flagging over-speeding vehicles.
-- 🚗 **Vehicle Counting & Classification**: Tracks and categorizes vehicles (cars, motorcycles, buses, trucks) passing through the scene.
-- 📸 **Automated Evidence Capture**: Automatically crops high-resolution snapshots of violating vehicles with metadata banners (ID, timestamp, speed, violation type) and exports audit logs (CSV/JSON).
+- 🔍 **Automatic Number Plate Recognition (ANPR / ALPR)**: Deep learning plate localization (`best_yolov8n.pt`) combined with multi-stage image preprocessing (contrast enhancement, bilateral filtering, adaptive thresholding) and Tesseract OCR to automatically read and record vehicle license plates.
+- 💳 **Automated Traffic Penalty & Fine Calculation**: Calculates offense fines (e.g. Signal Jump: ₹1,000, Speed Violation: ₹1,500, Dual Offense: ₹2,500) and reports them alongside plate numbers.
+- 🚗 **Vehicle Counting & Classification**: Tracks and categorizes vehicles (cars, motorcycles, buses, trucks) passing through the scene with multi-frame identity persistence.
+- 📸 **Automated Evidence Capture**: Automatically crops high-resolution snapshots of violating vehicles with insets of their detected license plate, offense details, fine amounts, and timestamps.
+- 📊 **Audit Logs (CSV/JSON)**: Comprehensive reporting including Violation ID, Vehicle ID, License Plate Number, Vehicle Class, Speed, Violation Type, Fine Amount (INR), Signal State, Frame, and Evidence Snapshot path.
 - 💻 **Interactive Web Dashboard**: Live surveillance stream with drag-and-drop stop line placement, signal control remote, and evidence gallery.
 
 ---
@@ -131,23 +134,26 @@ This generates `videos/synthetic_demo.mp4` containing compliant cars, red-light 
 DeepLearning/
 ├── app.py                     # Flask web backend with MJPEG streaming & REST APIs
 ├── detector.py                # YOLOv8 object detector for vehicle classification
-├── tracker.py                 # Multi-object tracker with road contact anchor points
+├── plate_recognizer.py        # Automatic Number Plate Recognition (ANPR / ALPR) & OCR engine
+├── tracker.py                 # Multi-object tracker with road contact anchor points & plate voting
 ├── speed_estimator.py         # Perspective-aware velocity calculation engine
 ├── signal_detector.py         # Traffic signal phase controller (Auto, Manual, HSV ROI)
-├── violation_detector.py      # Stop-line intersection math & evidence snapshot generator
-├── annotator.py               # Visual overlay renderer (Green=Normal, Red=Violation)
-├── pipeline.py                # Unified coordinator binding all detection & violation modules
-├── main.py                    # Standalone CLI batch processor with progress bar & reporting
+├── violation_detector.py      # Stop-line intersection math, fine calculation & evidence snapshots
+├── annotator.py               # Visual overlay renderer with plate tags, fine badges & corner brackets
+├── pipeline.py                # Unified coordinator binding detection, tracking, ANPR, & violations
+├── main.py                    # Standalone CLI batch processor with progress bar & ANPR logs
 ├── generate_sample_video.py   # Synthetic road intersection video generator
 ├── requirements.txt           # Python dependency specification
 ├── README.md                  # Project documentation & setup instructions
+├── models/
+│   └── best_yolov8n.pt        # Fine-tuned YOLOv8 license plate detector model
 ├── templates/
-│   └── index.html             # Web dashboard frontend template
+│   └── index.html             # Web dashboard frontend template with ANPR & Fines telemetry
 ├── static/
-│   ├── style.css              # Modern glassmorphic dark-theme styles
-│   └── app.js                 # Interactive frontend logic & canvas stop-line dragging
-├── videos/                    # Input video datasets (CCTV, roads, synthetic demo)
-└── violations/                # Exported violation evidence snapshot images
+│   ├── style.css              # Modern glassmorphic dark-theme styles with plate badges
+│   └── app.js                 # Interactive frontend logic & real-time telemetry polling
+├── videos/                    # Input video datasets (traffic_ip_camera.mp4, roads.mp4, etc.)
+└── violations/                # Exported violation evidence snapshot images with plate crops
 ```
 
 ---
@@ -155,6 +161,17 @@ DeepLearning/
 ## 📊 Output Artifacts & Reports
 
 Every time a violation occurs, the system records:
-1. **Evidence Snapshots (`violations/violation_<id>_<class>.jpg`)**: A high-resolution crop of the offending vehicle with a metadata banner showing Vehicle ID, Speed, Timestamp, and Offense category.
-2. **Audit CSV Report (`violations_report.csv`)**: Tabular export of all infractions for administrative review.
-3. **Audit JSON Report (`violations_report.json`)**: Machine-readable telemetry report containing summary metrics and per-vehicle trajectories.
+1. **Evidence Snapshots (`violations/viol_<id>_id<veh_id>_<plate>_<class>.jpg`)**: A high-resolution crop of the offending vehicle with an inset of the detected license plate and a detailed banner displaying Vehicle ID, Plate Number, Offense Type, Fine Charge (INR), Speed, and Timestamp.
+2. **Audit CSV Report (`violations_report.csv`)**: Tabular export containing:
+   - `Violation_ID`
+   - `Vehicle_ID`
+   - `License_Plate`
+   - `Vehicle_Class`
+   - `Speed_kmh`
+   - `Violation_Type`
+   - `Fine_Amount_INR`
+   - `Signal_State`
+   - `Frame`
+   - `Timestamp`
+   - `Evidence_Snapshot`
+3. **Audit JSON Report (`violations_report.json`)**: Machine-readable telemetry report containing total fines accumulated, summary violation metrics, and per-vehicle infraction details.

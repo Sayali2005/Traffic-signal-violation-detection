@@ -115,15 +115,19 @@ def main():
                 writer.write(annotated_frame)
 
             for viol in new_violations:
-                print(f" >> [ALERT] Frame {viol['frame_idx']} | ID #{viol['track_id']} ({viol['class_name']}) | "
-                      f"Speed: {viol['speed_kmh']} km/h | Violation: {viol['violation_type']} | Light: {viol['signal_state']}")
+                plate_str = viol.get('plate_number', 'N/A')
+                fine_str = viol.get('fine_str', '₹1,000')
+                print(f" >> [VIOLATION ALERT] Frame {viol['frame_idx']} | ID #{viol['track_id']} ({viol['class_name']}) | "
+                      f"Plate: {plate_str} | Speed: {viol['speed_kmh']} km/h | "
+                      f"Violation: {viol['violation_type']} | Fine: {fine_str} | Light: {viol['signal_state']}")
 
             if processed_count % 30 == 0 or processed_count == total_frames:
                 elapsed = time.time() - start_time
                 fps_proc = processed_count / max(0.001, elapsed)
                 pct = (processed_count / max(1, total_frames)) * 100
-                print(f"Progress: [{processed_count}/{total_frames}] {pct:.1f}% | Processing Speed: {fps_proc:.1f} FPS | "
-                      f"Vehicles: {stats['total_vehicles']} | Violations: {stats['total_violations']}", end="\r")
+                total_fines = stats.get('total_fines', 0)
+                print(f"Progress: [{processed_count}/{total_frames}] {pct:.1f}% | Speed: {fps_proc:.1f} FPS | "
+                      f"Vehicles: {stats['total_vehicles']} | Violations: {stats['total_violations']} | Fines: ₹{total_fines:,}", end="\r")
 
             if args.show:
                 cv2.imshow("Traffic Signal Violation Detection", annotated_frame)
@@ -139,19 +143,26 @@ def main():
 
     total_time = time.time() - start_time
     all_violations = pipeline.violation_detector.violations
+    total_fines_accum = sum(v.get('fine_amount', 1000) for v in all_violations)
 
-    # Export report to CSV
+    # Export report to CSV with Number Plate and Fine Charges
     csv_path = "violations_report.csv"
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer_csv = csv.writer(f)
-        writer_csv.writerow(["Violation_ID", "Vehicle_ID", "Class", "Speed_kmh", "Violation_Type", "Signal_State", "Frame", "Timestamp", "Evidence_Snapshot"])
+        writer_csv.writerow([
+            "Violation_ID", "Vehicle_ID", "License_Plate", "Vehicle_Class",
+            "Speed_kmh", "Violation_Type", "Fine_Amount_INR", "Signal_State",
+            "Frame", "Timestamp", "Evidence_Snapshot"
+        ])
         for v in all_violations:
             writer_csv.writerow([
                 v['violation_id'],
                 v['track_id'],
+                v.get('plate_number', 'N/A'),
                 v['class_name'],
                 v['speed_kmh'],
                 v['violation_type'],
+                v.get('fine_amount', 1000),
                 v['signal_state'],
                 v['frame_idx'],
                 v['timestamp'],
@@ -168,25 +179,37 @@ def main():
             'average_fps': round(processed_count / max(0.001, total_time), 2),
             'total_vehicles_counted': pipeline.tracker.total_counted,
             'total_violations_recorded': len(all_violations),
+            'total_fines_inr': total_fines_accum,
             'signal_jump_count': sum(1 for v in all_violations if "Signal Jump" in v['violation_type']),
             'speed_violation_count': sum(1 for v in all_violations if "Speed Violation" in v['violation_type']),
             'violations': all_violations
         }, f, indent=2)
 
-    print("\n" + "=" * 65)
-    print(" EXECUTION COMPLETE - PERFORMANCE ANALYSIS SUMMARY")
-    print("=" * 65)
-    print(f"Frames Processed      : {processed_count}")
-    print(f"Total Execution Time  : {total_time:.2f} seconds ({processed_count / max(0.001, total_time):.1f} FPS)")
-    print(f"Total Vehicles Counted: {pipeline.tracker.total_counted}")
-    print(f"Total Violations      : {len(all_violations)}")
-    print(f"  - Signal Jumps      : {sum(1 for v in all_violations if 'Signal Jump' in v['violation_type'])}")
-    print(f"  - Speeding Exceeded : {sum(1 for v in all_violations if 'Speed Violation' in v['violation_type'])}")
-    print(f"Violations CSV Report : {csv_path}")
-    print(f"Violations JSON Report: {json_path}")
+    print("\n" + "=" * 70)
+    print(" EXECUTION COMPLETE - TRAFFIC SURVEILLANCE & ANPR SUMMARY")
+    print("=" * 70)
+    print(f"Frames Processed       : {processed_count}")
+    print(f"Total Execution Time   : {total_time:.2f} seconds ({processed_count / max(0.001, total_time):.1f} FPS)")
+    print(f"Total Vehicles Counted : {pipeline.tracker.total_counted}")
+    print(f"Total Violations       : {len(all_violations)}")
+    print(f"  - Signal Jumps       : {sum(1 for v in all_violations if 'Signal Jump' in v['violation_type'])}")
+    print(f"  - Speeding Exceeded  : {sum(1 for v in all_violations if 'Speed Violation' in v['violation_type'])}")
+    print(f"Total Fines Charged    : ₹{total_fines_accum:,}")
+    print(f"Violations CSV Report  : {csv_path}")
+    print(f"Violations JSON Report : {json_path}")
     if args.output:
-        print(f"Annotated Video Output: {args.output}")
-    print("=" * 65)
+        print(f"Annotated Video Output : {args.output}")
+
+    if all_violations:
+        print("\n" + "-" * 70)
+        print(f"{'ID':<4} | {'PLATE':<14} | {'CLASS':<8} | {'SPEED':<10} | {'FINE (INR)':<10} | {'VIOLATION'}")
+        print("-" * 70)
+        for v in all_violations:
+            p_text = v.get('plate_number', 'N/A')
+            f_text = f"₹{v.get('fine_amount', 1000):,}"
+            print(f"{v['track_id']:<4} | {p_text:<14} | {v['class_name']:<8} | {v['speed_kmh']:<4} km/h   | {f_text:<10} | {v['violation_type']}")
+        print("-" * 70)
+    print("=" * 70)
 
 if __name__ == "__main__":
     main()

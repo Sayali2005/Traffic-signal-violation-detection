@@ -23,6 +23,16 @@ def point_line_side(p: Tuple[float, float], l1: Tuple[float, float], l2: Tuple[f
     """Signed cross product determining which side of line (l1->l2) point p lies on."""
     return (l2[0] - l1[0]) * (p[1] - l1[1]) - (l2[1] - l1[1]) * (p[0] - l1[0])
 
+def get_violation_fine(violation_label: str) -> int:
+    """Calculate fine amount based on offense severity."""
+    if "Signal Jump" in violation_label and "Speed Violation" in violation_label:
+        return 2500
+    elif "Signal Jump" in violation_label:
+        return 1000
+    elif "Speed Violation" in violation_label:
+        return 1500
+    return 1000
+
 class ViolationDetector:
     def __init__(
         self,
@@ -106,18 +116,24 @@ class ViolationDetector:
                 self.violation_counter += 1
 
                 violation_label = "Signal Jump & Speed Violation" if v.is_overspeeding else "Signal Jump"
-                snapshot_filename = f"signal_jump_{self.violation_counter}_id{v.track_id}_{v.class_name}.jpg"
+                fine_val = get_violation_fine(violation_label)
+                plate_txt = getattr(v, 'plate_number', 'DETECTING...')
+                snapshot_filename = f"viol_{self.violation_counter}_id{v.track_id}_{plate_txt}_{v.class_name}.jpg"
                 snapshot_path = os.path.join(self.output_dir, snapshot_filename)
 
                 # Save cropped evidence
-                self._save_evidence_snapshot(frame, v, snapshot_path, violation_label, current_time)
+                self._save_evidence_snapshot(frame, v, snapshot_path, violation_label, fine_val, current_time, signal_state)
 
                 record = {
                     'violation_id': self.violation_counter,
                     'track_id': v.track_id,
+                    'plate_number': plate_txt,
+                    'plate_verified': getattr(v, 'plate_verified', False),
                     'class_name': v.class_name,
-                    'speed_kmh': v.speed_kmh,
+                    'speed_kmh': round(v.speed_kmh, 1),
                     'violation_type': violation_label,
+                    'fine_amount': fine_val,
+                    'fine_str': f"₹{fine_val:,}",
                     'signal_state': signal_state,
                     'frame_idx': frame_idx,
                     'timestamp': current_time,
@@ -134,18 +150,24 @@ class ViolationDetector:
                 self.violation_counter += 1
 
                 violation_label = "Speed Violation"
-                snapshot_filename = f"speeding_{self.violation_counter}_id{v.track_id}_{v.class_name}.jpg"
+                fine_val = get_violation_fine(violation_label)
+                plate_txt = getattr(v, 'plate_number', 'DETECTING...')
+                snapshot_filename = f"speeding_{self.violation_counter}_id{v.track_id}_{plate_txt}_{v.class_name}.jpg"
                 snapshot_path = os.path.join(self.output_dir, snapshot_filename)
 
                 # Save cropped evidence
-                self._save_evidence_snapshot(frame, v, snapshot_path, violation_label, current_time)
+                self._save_evidence_snapshot(frame, v, snapshot_path, violation_label, fine_val, current_time, signal_state)
 
                 record = {
                     'violation_id': self.violation_counter,
                     'track_id': v.track_id,
+                    'plate_number': plate_txt,
+                    'plate_verified': getattr(v, 'plate_verified', False),
                     'class_name': v.class_name,
-                    'speed_kmh': v.speed_kmh,
+                    'speed_kmh': round(v.speed_kmh, 1),
                     'violation_type': violation_label,
+                    'fine_amount': fine_val,
+                    'fine_str': f"₹{fine_val:,}",
                     'signal_state': signal_state,
                     'frame_idx': frame_idx,
                     'timestamp': current_time,
@@ -163,14 +185,16 @@ class ViolationDetector:
         vehicle: TrackedVehicle,
         output_path: str,
         violation_label: str,
-        timestamp: str
+        fine_amount: int,
+        timestamp: str,
+        signal_state: str = "RED"
     ):
         h, w = frame.shape[:2]
         x1, y1, x2, y2 = vehicle.bbox
 
         # Add margin around vehicle
-        pad_x = int((x2 - x1) * 0.3)
-        pad_y = int((y2 - y1) * 0.3)
+        pad_x = int((x2 - x1) * 0.35)
+        pad_y = int((y2 - y1) * 0.35)
 
         crop_x1 = max(0, x1 - pad_x)
         crop_y1 = max(0, y1 - pad_y)
@@ -182,19 +206,57 @@ class ViolationDetector:
             return
 
         # Draw red border on evidence crop
-        cv2.rectangle(crop, (0, 0), (crop.shape[1] - 1, crop.shape[0] - 1), (0, 0, 255), 3)
+        cv2.rectangle(crop, (0, 0), (crop.shape[1] - 1, crop.shape[0] - 1), (0, 0, 235), 3)
 
-        # Header banner
-        banner_h = 42
+        # Highlight vehicle bounding box in crop
+        vx1_rel = max(2, x1 - crop_x1)
+        vy1_rel = max(2, y1 - crop_y1)
+        vx2_rel = min(crop.shape[1] - 3, x2 - crop_x1)
+        vy2_rel = min(crop.shape[0] - 3, y2 - crop_y1)
+        cv2.rectangle(crop, (vx1_rel, vy1_rel), (vx2_rel, vy2_rel), (0, 70, 255), 2)
+
+        # Ensure minimum width of 500px for crystal-clear header text readability
+        if crop.shape[1] < 500:
+            diff = 500 - crop.shape[1]
+            pad_l = diff // 2
+            pad_r = diff - pad_l
+            crop = cv2.copyMakeBorder(crop, 0, 0, pad_l, pad_r, cv2.BORDER_CONSTANT, value=(14, 16, 22))
+
+        # If vehicle has a recognized plate crop, prepare an inset badge
+        plate_crop = getattr(vehicle, 'plate_crop', None)
+        if plate_crop is not None and plate_crop.size > 0:
+            try:
+                # Resize plate crop to standard height of 45px
+                target_h = 45
+                p_aspect = plate_crop.shape[1] / max(1, plate_crop.shape[0])
+                target_w = max(90, min(180, int(target_h * p_aspect)))
+                p_resized = cv2.resize(plate_crop, (target_w, target_h), interpolation=cv2.INTER_CUBIC)
+                
+                # Place at bottom-right of the crop if space permits
+                if crop.shape[0] > target_h + 10 and crop.shape[1] > target_w + 10:
+                    px_start = crop.shape[1] - target_w - 10
+                    py_start = crop.shape[0] - target_h - 10
+                    # Border around plate inset
+                    cv2.rectangle(crop, (px_start - 2, py_start - 2), (px_start + target_w + 2, py_start + target_h + 2), (0, 255, 255), 2)
+                    crop[py_start:py_start + target_h, px_start:px_start + target_w] = p_resized
+                    cv2.putText(crop, "PLATE", (px_start, py_start - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 255, 255), 1, cv2.LINE_AA)
+            except Exception:
+                pass
+
+        # High-definition header banner
+        banner_h = 62
         banner = np.zeros((banner_h, crop.shape[1], 3), dtype=np.uint8)
-        banner[:] = (20, 20, 30)
-        
-        # Overlay text on banner
+        banner[:] = (18, 22, 28)
+
         font = cv2.FONT_HERSHEY_SIMPLEX
-        text_top = f"ID #{vehicle.track_id} {vehicle.class_name.upper()} | {vehicle.speed_kmh} km/h"
-        text_sub = f"VIOLATION: {violation_label}"
-        cv2.putText(banner, text_top, (8, 16), font, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
-        cv2.putText(banner, text_sub, (8, 34), font, 0.45, (0, 70, 255), 1, cv2.LINE_AA)
+        plate_str = getattr(vehicle, 'plate_number', 'N/A')
+        text_top = f"VEHICLE #{vehicle.track_id} {vehicle.class_name.upper()} | PLATE: {plate_str}"
+        text_mid = f"OFFENSE: {violation_label} | FINE CHARGE: INR {fine_amount:,}"
+        text_bot = f"SPEED: {vehicle.speed_kmh} km/h | SIGNAL: {signal_state} | TIME: {timestamp}"
+
+        cv2.putText(banner, text_top, (10, 18), font, 0.44, (0, 220, 255), 1, cv2.LINE_AA)
+        cv2.putText(banner, text_mid, (10, 38), font, 0.46, (0, 80, 255), 1, cv2.LINE_AA)
+        cv2.putText(banner, text_bot, (10, 56), font, 0.38, (180, 190, 205), 1, cv2.LINE_AA)
 
         combined = np.vstack([banner, crop])
         cv2.imwrite(output_path, combined)

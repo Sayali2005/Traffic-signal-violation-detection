@@ -13,6 +13,10 @@ opencv-python>=4.8.0
 numpy>=1.24.0
 scipy>=1.10.0
 
+# OCR & License Plate Recognition
+pytesseract>=0.3.10
+omegaconf>=2.3.0
+
 # Web Dashboard & APIs
 Flask>=3.0.0
 flask-cors>=4.0.0

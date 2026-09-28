@@ -16,6 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const statActiveVehicles = document.getElementById('stat-active-vehicles');
     const statSignalViolations = document.getElementById('stat-signal-violations');
     const statSpeedViolations = document.getElementById('stat-speed-violations');
+    const statTotalFines = document.getElementById('stat-total-fines');
+    const statPlatesDetected = document.getElementById('stat-plates-detected');
     const statFps = document.getElementById('stat-fps');
 
     // Video & Remote Controls
@@ -49,9 +51,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCloseModal = document.getElementById('btn-close-modal');
     const modalEvidenceImg = document.getElementById('modal-evidence-img');
     const modalDetailId = document.getElementById('modal-detail-id');
+    const modalDetailPlate = document.getElementById('modal-detail-plate');
     const modalDetailClass = document.getElementById('modal-detail-class');
     const modalDetailSpeed = document.getElementById('modal-detail-speed');
     const modalDetailLight = document.getElementById('modal-detail-light');
+    const modalDetailFine = document.getElementById('modal-detail-fine');
     const modalDetailViolation = document.getElementById('modal-detail-violation');
     const btnDownloadEvidence = document.getElementById('btn-download-evidence');
 
@@ -307,6 +311,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     statActiveVehicles.textContent = s.active_vehicles || 0;
                     statSignalViolations.textContent = s.signal_violations || 0;
                     statSpeedViolations.textContent = s.speed_violations || 0;
+                    if (statTotalFines) {
+                        statTotalFines.textContent = '₹' + (s.total_fines || 0).toLocaleString();
+                    }
+                    if (statPlatesDetected) {
+                        statPlatesDetected.textContent = s.plates_detected || 0;
+                    }
                     statFps.textContent = (s.fps_actual || 0).toFixed(1);
 
                     if (s.frame_w && s.frame_h) {
@@ -363,6 +373,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = document.createElement('div');
             card.className = 'incident-card';
             card.dataset.violId = v.violation_id;
+            const plateNum = v.plate_number || 'N/A';
+            const fineText = v.fine_str || ('₹' + (v.fine_amount || 1000).toLocaleString());
 
             card.innerHTML = `
                 <div class="incident-thumb-wrap">
@@ -371,6 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="incident-details">
                     <div class="incident-row-top">
                         <span class="incident-id">#${v.track_id} ${v.class_name.toUpperCase()}</span>
+                        <span class="incident-plate-pill">${plateNum}</span>
                         <span class="incident-time">${v.timestamp.split(' ')[1] || v.timestamp}</span>
                     </div>
                     <div class="incident-row-mid">
@@ -378,7 +391,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class="incident-speed-tag">${v.speed_kmh} km/h</span>
                     </div>
                     <div class="incident-row-bot">
-                        <span>Signal: ${v.signal_state} &bull; Frame: ${v.frame_idx}</span>
+                        <span class="incident-fine-tag">Fine: ${fineText}</span>
+                        <span>&bull; Light: ${v.signal_state} &bull; F#${v.frame_idx}</span>
                     </div>
                 </div>
             `;
@@ -394,9 +408,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function openModal(v) {
         modalEvidenceImg.src = `/violations/${v.snapshot_file}`;
         modalDetailId.textContent = `#${v.track_id}`;
+        if (modalDetailPlate) modalDetailPlate.textContent = v.plate_number || 'N/A';
         modalDetailClass.textContent = v.class_name.toUpperCase();
         modalDetailSpeed.textContent = `${v.speed_kmh} km/h`;
         modalDetailLight.textContent = v.signal_state;
+        if (modalDetailFine) modalDetailFine.textContent = v.fine_str || ('₹' + (v.fine_amount || 1000).toLocaleString());
         modalDetailViolation.textContent = v.violation_type;
         btnDownloadEvidence.href = `/violations/${v.snapshot_file}`;
 
